@@ -253,3 +253,4 @@
    GenieSim <embodied/geniesim>
    MuJoCo Warp <embodied/mujoco_warp>
    真机仿真器 <embodied/real_simulator>
+   Cosmos-Nano 世界模型 <embodied/cosmos3_medical_pads>

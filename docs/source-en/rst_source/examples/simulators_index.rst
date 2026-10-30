@@ -253,3 +253,4 @@ If you are starting from "I want to train on benchmark *X*", this is the right e
    GenieSim <embodied/geniesim>
    MuJoCo Warp <embodied/mujoco_warp>
    Real-World Simulator <embodied/real_simulator>
+   Cosmos-Nano World Model <embodied/cosmos3_medical_pads>
