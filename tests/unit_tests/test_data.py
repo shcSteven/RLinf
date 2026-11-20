@@ -1242,6 +1242,10 @@ def test_env_output_preserves_nested_observations():
                 "frame_mask": torch.tensor([[False, True, True]] * 2),
                 "time_offsets": torch.tensor([[0.0, -3.5, 0.0]] * 2),
             },
+            "tactile": {
+                "deform_maps": torch.full((2, 10, 4, 4), value, dtype=torch.uint8),
+                "forces": torch.full((2, 16, 60), float(value)),
+            },
         }
 
     output = EnvOutput(obs=observation(1), final_obs=observation(7))
@@ -1249,7 +1253,7 @@ def test_env_output_preserves_nested_observations():
 
     for name, original in (("obs", output.obs), ("final_obs", output.final_obs)):
         assert "depth_images" not in payload[name]
-        for key in ("states", "reset_mask", "history"):
+        for key in ("states", "reset_mask", "history", "tactile"):
             torch.testing.assert_close(payload[name][key], original[key])
     assert (
         "history" not in EnvOutput(obs={"states": torch.zeros(2, 3)}).to_dict()["obs"]

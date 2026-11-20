@@ -209,7 +209,11 @@ def convert_to_isaaclab_stack_cube_action(
 
 
 def convert_h2_sharpa_wm_obs_to_gr00t_format(env_obs):
-    """Map the native H2/Sharpa 7+7+22+22 state and left-head RGB to GR00T."""
+    """Map the native H2/Sharpa 7+7+22+22 state and left-head RGB to GR00T.
+
+    A ``tactile`` observation (fingertip deformation maps ``[B, N, H, W]`` and
+    a force window ``[B, W, 6N]``) is passed on under ``tactile.*`` keys.
+    """
     images, states = env_obs["main_images"], env_obs["states"]
     images = (
         images.cpu().numpy() if isinstance(images, torch.Tensor) else np.asarray(images)
@@ -232,7 +236,38 @@ def convert_h2_sharpa_wm_obs_to_gr00t_format(env_obs):
         ("right_hand", 36, 58),
     ):
         obs[f"state.{name}"] = states[:, None, start:end]
+    tactile = env_obs.get("tactile")
+    if tactile is not None:
+        for name, value in tactile.items():
+            obs[f"tactile.{name}"] = (
+                value.cpu().numpy()
+                if isinstance(value, torch.Tensor)
+                else np.asarray(value)
+            )
     return obs
+
+
+def h2_sharpa_tactile_model_inputs(obs: dict) -> dict[str, torch.Tensor]:
+    """Build the tactile action-head inputs of the tactile GR00T N1.7 model.
+
+    Values stay raw, as in that model's training transform: maps are cast to
+    float without scaling, and the hand joint angles feed its fingertip
+    kinematics.
+
+    Args:
+        obs: Output of :func:`convert_h2_sharpa_wm_obs_to_gr00t_format` that
+            carries the ``tactile.*`` keys.
+
+    Returns:
+        ``deform_maps`` ``[B, N, 1, H, W]``, ``tactile_force`` ``[B, W, 6N]``
+        and ``joint_angles_left`` / ``joint_angles_right`` ``[B, 22]``.
+    """
+    return {
+        "deform_maps": torch.from_numpy(obs["tactile.deform_maps"]).float()[:, :, None],
+        "tactile_force": torch.from_numpy(obs["tactile.forces"]).float(),
+        "joint_angles_left": torch.from_numpy(obs["state.left_hand"][:, -1]).float(),
+        "joint_angles_right": torch.from_numpy(obs["state.right_hand"][:, -1]).float(),
+    }
 
 
 def convert_to_h2_sharpa_action_n1d7(action_chunk, chunk_size=16):

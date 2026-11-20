@@ -30,6 +30,7 @@ from rlinf.envs.wrappers.record_video import RecordVideo
 from rlinf.models.embodiment.gr00t.simulation_io import (
     convert_h2_sharpa_wm_obs_to_gr00t_format,
     convert_to_h2_sharpa_action_n1d7,
+    h2_sharpa_tactile_model_inputs,
 )
 from rlinf.scheduler import Worker
 from rlinf.workers.actor.embodied_fsdp_actor_worker import EmbodiedFSDPActor
@@ -194,6 +195,25 @@ def test_h2_gr00t_round_trip_keeps_physical_joint_targets(prefix):
     prepared = prepare_actions(decoded, "cosmos3_wm", "gr00t_n1d7", 16, 58)
     np.testing.assert_array_equal(prepared, states[:, None].repeat(1, 16, 1).numpy())
     assert obs["video.high"].shape == (1, 1, 2, 3, 3)
+
+
+def test_h2_tactile_observation_becomes_raw_gr00t_tactile_inputs():
+    states = torch.arange(58).float()[None]
+    maps = torch.arange(160, dtype=torch.uint8).reshape(1, 10, 4, 4)
+    forces = torch.arange(960).float().reshape(1, 16, 60)
+    obs = convert_h2_sharpa_wm_obs_to_gr00t_format(
+        {
+            "main_images": torch.zeros(1, 2, 3, 3, dtype=torch.uint8),
+            "states": states,
+            "task_descriptions": ["unfold pad"],
+            "tactile": {"deform_maps": maps, "forces": forces},
+        }
+    )
+    inputs = h2_sharpa_tactile_model_inputs(obs)
+    torch.testing.assert_close(inputs["deform_maps"], maps.float()[:, :, None])
+    torch.testing.assert_close(inputs["tactile_force"], forces)
+    torch.testing.assert_close(inputs["joint_angles_left"], states[:, 14:36])
+    torch.testing.assert_close(inputs["joint_angles_right"], states[:, 36:58])
 
 
 @pytest.mark.parametrize("with_modality", [False, True])

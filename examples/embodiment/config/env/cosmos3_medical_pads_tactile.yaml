@@ -1,0 +1,18 @@
+defaults:
+  - cosmos3_medical_pads
+  - _self_
+
+env_type: cosmos3_tactile_wm
+
+# Composite frame: 640x480 head camera, a 32-row gap, two rows of five 128-px tiles.
+image_size: [768, 640]
+
+reward_model:
+  frame_size: [480, 640]
+
+tactile:
+  tile: 128
+  gap: 32
+  force_window: 16
+  encoder_checkpoint: ${oc.env:SHARPA_ENCODER_CHECKPOINT}
+  force_readout: ${oc.env:TACTILE_FORCE_READOUT}

@@ -33,6 +33,7 @@ from rlinf.models.embodiment.base_policy import BasePolicy, ForwardType
 from rlinf.models.embodiment.gr00t.simulation_io import (
     ACTION_CONVERSION_N1D7,
     OBS_CONVERSION,
+    h2_sharpa_tactile_model_inputs,
 )
 from rlinf.models.embodiment.gr00t.utils import (
     squeeze_dict_values,
@@ -115,6 +116,14 @@ _FORWARD_INPUT_SKIP_KEYS = {
     "denoise_inds",
 }
 
+# Action-head inputs of the tactile GR00T N1.7 model.
+_TACTILE_INPUT_KEYS = (
+    "deform_maps",
+    "tactile_force",
+    "joint_angles_left",
+    "joint_angles_right",
+)
+
 _FORWARD_INPUT_MODEL_KEYS = {
     "state",
     "state_mask",
@@ -126,6 +135,7 @@ _FORWARD_INPUT_MODEL_KEYS = {
     "pixel_values",
     "image_grid_thw",
     "image_sizes",
+    *_TACTILE_INPUT_KEYS,
 }
 
 
@@ -385,10 +395,24 @@ class FlowMatchingActionHeadForRLActionPrediction(Gr00tN1d7ActionHead):
             return state
         return state_encoder(state, embodiment_id)
 
+    def _encode_tactile_features(
+        self, action_input: BatchFeature
+    ) -> Optional[torch.Tensor]:
+        """Encode the tactile tokens; ``None`` for a head without a tactile path."""
+        if not getattr(self, "use_tactile", False):
+            return None
+        return self._compute_tactile_features(action_input)
+
     def prepare_input(self, inputs: dict) -> BatchFeature:
         """Collect the action-head relevant fields into a ``BatchFeature``."""
         action_inputs = {}
-        for k in ["state", "action", "action_mask", "embodiment_id"]:
+        for k in [
+            "state",
+            "action",
+            "action_mask",
+            "embodiment_id",
+            *_TACTILE_INPUT_KEYS,
+        ]:
             if k in inputs:
                 action_inputs[k] = inputs[k]
 
@@ -428,6 +452,7 @@ class FlowMatchingActionHeadForRLActionPrediction(Gr00tN1d7ActionHead):
         mode: Literal["train", "eval"] = "train",
         compute_values=False,
         backbone_output: Optional[BatchFeature] = None,
+        tactile_features: Optional[torch.Tensor] = None,
     ):
         """Compute the mean and std of the posterior over the next denoising state.
 
@@ -480,6 +505,10 @@ class FlowMatchingActionHeadForRLActionPrediction(Gr00tN1d7ActionHead):
         sa_embs = torch.cat((state_features, action_features), dim=1)
 
         denoising_model = self._get_component("model")
+        # Only the tactile model's denoiser takes tactile tokens.
+        tactile_kwargs = (
+            {} if tactile_features is None else {"tactile_features": tactile_features}
+        )
         if denoising_model is not None:
             if (
                 getattr(self.config, "use_alternate_vl_dit", False)
@@ -491,12 +520,14 @@ class FlowMatchingActionHeadForRLActionPrediction(Gr00tN1d7ActionHead):
                     timestep=timesteps_tensor,
                     image_mask=backbone_output.image_mask,
                     backbone_attention_mask=backbone_output.backbone_attention_mask,
+                    **tactile_kwargs,
                 )
             else:
                 model_output = denoising_model(
                     hidden_states=sa_embs,
                     encoder_hidden_states=vl_embs,
                     timestep=timesteps_tensor,
+                    **tactile_kwargs,
                 )
         else:
             model_output = sa_embs
@@ -596,6 +627,7 @@ class FlowMatchingActionHeadForRLActionPrediction(Gr00tN1d7ActionHead):
             action_input.embodiment_id if hasattr(action_input, "embodiment_id") else 0
         )
         state_features = self._encode_state_features(action_input, embodiment_id)
+        tactile_features = self._encode_tactile_features(action_input)
         batch_size = vl_embs.shape[0]
         device = vl_embs.device
         x_t = torch.randn(
@@ -640,6 +672,7 @@ class FlowMatchingActionHeadForRLActionPrediction(Gr00tN1d7ActionHead):
                 denoise_steps=num_steps,
                 compute_values=compute_values,
                 backbone_output=backbone_output,
+                tactile_features=tactile_features,
             )
 
             x_t = (
@@ -696,6 +729,7 @@ class FlowMatchingActionHeadForRLActionPrediction(Gr00tN1d7ActionHead):
             action_input.embodiment_id if hasattr(action_input, "embodiment_id") else 0
         )
         state_features = self._encode_state_features(action_input, embodiment_id)
+        tactile_features = self._encode_tactile_features(action_input)
         batch_size = vl_embs.shape[0]
 
         chains_log_probs = []
@@ -726,6 +760,7 @@ class FlowMatchingActionHeadForRLActionPrediction(Gr00tN1d7ActionHead):
                 denoise_steps=self.num_inference_timesteps,
                 compute_values=compute_values,
                 backbone_output=backbone_output,
+                tactile_features=tactile_features,
             )
             log_probs = self.get_logprob_norm(chains_next, x_t_mean, x_t_std)
             chains_log_probs.append(log_probs)
@@ -1133,7 +1168,10 @@ class GR00T_N1_7_ForRLActionPrediction(Gr00tN1d7, BasePolicy):
 
     def apply_transforms(self, obs: dict) -> dict:
         """Tokenize/normalize a batched observation via the GR00T processor."""
-        return self._modality_transform.process_observation(obs, self.embodiment_tag)
+        inputs = self._modality_transform.process_observation(obs, self.embodiment_tag)
+        if getattr(self.action_head, "use_tactile", False):
+            inputs.update(h2_sharpa_tactile_model_inputs(obs))
+        return inputs
 
     def unapply_transforms(
         self,

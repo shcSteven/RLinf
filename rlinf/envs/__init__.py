@@ -38,6 +38,7 @@ class SupportedEnvType(Enum):
     FRANKASIM = "frankasim"
     HABITAT = "habitat"
     COSMOS3WM = "cosmos3_wm"
+    COSMOS3TACTILEWM = "cosmos3_tactile_wm"
     WORLD_MODEL = "world_model"
     GENESIS = "genesis"
     EMBODICHAIN = "embodichain"
@@ -163,6 +164,10 @@ def get_env_cls(env_type: str, env_cfg=None):
         from rlinf.envs.sim.world_model.cosmos3_env import Cosmos3Env
 
         return Cosmos3Env
+    elif env_type == SupportedEnvType.COSMOS3TACTILEWM:
+        from rlinf.envs.sim.world_model.cosmos3_tactile_env import Cosmos3TactileEnv
+
+        return Cosmos3TactileEnv
     elif env_type == SupportedEnvType.WORLD_MODEL:
         from rlinf.envs.sim.world_model import WorldModelEnv
 

@@ -1708,7 +1708,7 @@ class EnvOutput:
         }
         if obs.get("active_mask") is not None:
             prepared["active_mask"] = obs["active_mask"]
-        for key in ("reset_mask", "history"):
+        for key in ("reset_mask", "history", "tactile"):
             if key in obs:
                 prepared[key] = obs[key]
         task_descriptions = obs.get("task_descriptions")
