@@ -17,8 +17,12 @@ from torch import nn
 class ClassifierReward(nn.Module):
     """Score each frame independently; progress can decrease after a refold."""
 
-    def __init__(self, checkpoint, num_envs=0, device="cpu", config_file=None):
+    def __init__(
+        self, checkpoint, num_envs=0, device="cpu", config_file=None, frame_size=None
+    ):
         super().__init__()
+        # Height and width of the top-left region to score; None scores the frame.
+        self.frame_size = tuple(frame_size) if frame_size is not None else None
         from torchvision.models import resnet18
 
         checkpoint = Path(checkpoint).expanduser()
@@ -110,6 +114,8 @@ class ClassifierReward(nn.Module):
         """
         if frames.ndim != 5 or frames.shape[0] != self.num_envs or frames.shape[2] != 3:
             raise ValueError("Expected RGB frames [num_envs,T,3,H,W]")
+        if self.frame_size is not None:
+            frames = frames[..., : self.frame_size[0], : self.frame_size[1]]
         if frames.dtype != torch.uint8:
             frames = ((frames.float() + 1) * 127.5).round().clamp(0, 255).byte()
         if self.legacy_pil:

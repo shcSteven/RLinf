@@ -20,6 +20,9 @@ from rlinf.envs.sim.world_model.env import WorldModelEnv
 class Cosmos3Env(WorldModelEnv):
     """Keep the H2 reset, proprioception and evaluation contracts across backends."""
 
+    # Builds the dataset that supplies reset frames, states and action anchors.
+    reset_dataset_cls = LeRobotV21InitDataset
+
     def __init__(
         self,
         cfg,
@@ -85,7 +88,7 @@ class Cosmos3Env(WorldModelEnv):
                         f"Expected one alias for camera {video_key!r}, found {aliases}"
                     )
                 video_key = aliases[0]
-        dataset = LeRobotV21InitDataset(
+        dataset = self.reset_dataset_cls(
             cfg.initial_image_path,
             video_key=video_key,
             state_dim=58,

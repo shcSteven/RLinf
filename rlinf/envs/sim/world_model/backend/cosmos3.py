@@ -90,6 +90,7 @@ class Cosmos3Backend:
         return ClassifierReward(
             cfg.reward_model.from_pretrained,
             config_file=cfg.reward_model.get("config_file"),
+            frame_size=cfg.reward_model.get("frame_size"),
         )
 
     def reward_instructions(self, env):

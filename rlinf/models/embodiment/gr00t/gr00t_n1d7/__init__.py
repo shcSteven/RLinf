@@ -84,10 +84,25 @@ def get_model(cfg: DictConfig, torch_dtype=torch.bfloat16):
         if not model_path.exists():
             raise FileNotFoundError(f"Model path does not exist: {model_path}")
 
-        config = Gr00tN1d7Config.from_pretrained(str(model_path))
+        # The checkpoint names its config class, so a variant of the model
+        # that registers its own class loads with it.
+        config = AutoConfig.from_pretrained(str(model_path))
         _action_dim = cfg.get("action_dim")
         if _action_dim is not None:
             config.action_dim = _action_dim
+        # Fields of the saved model config that differ in this run, such as
+        # asset paths recorded at training time or what stays trainable.
+        config_overrides = OmegaConf.select(cfg, "config_overrides", default=None)
+        if config_overrides is not None:
+            for key, value in OmegaConf.to_container(
+                config_overrides, resolve=True
+            ).items():
+                if not hasattr(config, key):
+                    raise ValueError(
+                        f"config_overrides names {key!r}, which the saved model "
+                        f"config ({type(config).__name__}) does not have."
+                    )
+                setattr(config, key, value)
 
         backbone_model_path = OmegaConf.select(cfg, "backbone_model_path", default=None)
 
