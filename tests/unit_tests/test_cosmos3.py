@@ -24,6 +24,7 @@ from rlinf.data.datasets.lerobot_world_model import (
     LeRobotV21InitDataset,
 )
 from rlinf.envs.action_utils import prepare_actions
+from rlinf.envs.layout import EnvSpec
 from rlinf.envs.sim.world_model.classifier_reward import ClassifierReward
 from rlinf.envs.sim.world_model.cosmos3_env import Cosmos3Env
 from rlinf.envs.wrappers.record_video import RecordVideo
@@ -673,8 +674,9 @@ def process_batch(ignore_terminations, reward_type, epochs=1):
         "rewards": torch.cat([rewards] * epochs),
         "dones": torch.cat([dones] * epochs),
     }
-    processed = EmbodiedFSDPActor._process_received_rollout_batch(
-        SimpleNamespace(cfg=cfg), batch
+    spec = EnvSpec(name=None, cfg=cfg.env.train, ranks=range(1))
+    processed, _ = EmbodiedFSDPActor._process_received_rollout_batch(
+        SimpleNamespace(_env_algorithm_cfgs={None: cfg.algorithm}), batch, spec
     )
     result = calculate_adv_and_returns(
         task_type="embodied",
