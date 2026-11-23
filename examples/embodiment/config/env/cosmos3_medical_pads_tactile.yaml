@@ -13,6 +13,8 @@ reward_model:
 tactile:
   tile: 128
   gap: 32
+  # Map values below this become 0 before the policy and the force read-out; 0 keeps them.
+  map_floor: 2
   force_window: 16
   encoder_checkpoint: ${oc.env:SHARPA_ENCODER_CHECKPOINT}
   force_readout: ${oc.env:TACTILE_FORCE_READOUT}

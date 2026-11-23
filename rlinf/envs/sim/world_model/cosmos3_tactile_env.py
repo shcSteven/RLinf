@@ -177,6 +177,7 @@ class Cosmos3TactileEnv(Cosmos3Env):
         self.layout = H2TilesLayout(tile=tactile.tile, gap=tactile.gap)
         # The model snaps a frame to a known canvas; the composite must be one.
         register_canvas(self.layout, "480")
+        self.map_floor = int(tactile.map_floor)
         self.force_window = int(tactile.force_window)
         if self.force_window > self.chunk:
             raise ValueError(
@@ -202,6 +203,8 @@ class Cosmos3TactileEnv(Cosmos3Env):
         num_envs, num_frames = canvas.shape[:2]
         tiles = crop_tiles(canvas.flatten(0, 1).cpu().numpy(), self.layout)
         maps = torch.from_numpy(upsample_tiles(tiles))
+        # Generated tiles carry a faint background that recorded maps lack.
+        maps = maps * (maps >= self.map_floor)
         forces = self.force_readout(maps).view(num_envs, num_frames, -1)
         # Before the first chunk only the reset frame exists; it fills the window.
         if num_frames < self.force_window:
